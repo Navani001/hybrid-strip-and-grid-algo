@@ -156,11 +156,54 @@
         bottom: 0;
         left: 0;
         width: 100%;
-        background: var(--accent-green);
-        opacity: 0.8;
-        border-radius: inherit;
-        transition: height 0.5s ease-out;
+        background-color: #e3c498;
+        background-image:
+          radial-gradient(#c69c6d 15%, transparent 16%),
+          radial-gradient(#c69c6d 15%, transparent 16%);
+        background-size: 8px 8px;
+        background-position:
+          0 0,
+          4px 4px;
+        opacity: 0.95;
+        border-top-left-radius: 50% 15px;
+        border-top-right-radius: 50% 15px;
+        border-bottom-left-radius: 4px;
+        border-bottom-right-radius: 4px;
+        transition: height 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
         z-index: 1;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Sand falling animation container */
+      .sand-fall {
+        position: absolute;
+        width: 6px;
+        height: 12px;
+        background: #e3c498;
+        border-radius: 3px;
+        opacity: 0.9;
+        /* create an inner shadow to look a bit grainy */
+        box-shadow: inset -1px -1px 2px rgba(180, 140, 95, 0.4);
+        animation: fall 0.5s ease-in forwards;
+        z-index: 6;
+      }
+
+      @keyframes fall {
+        0% {
+          transform: translate(var(--dx), var(--start-y)) scale(1);
+          opacity: 0;
+        }
+        20% {
+          opacity: 1;
+        }
+        80% {
+          transform: translate(var(--dx), var(--end-y)) scale(1.1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(var(--dx), calc(var(--end-y) + 5px)) scale(0.2);
+          opacity: 0;
+        }
       }
 
       .grid .label {
@@ -786,14 +829,30 @@
             g.div.classList.remove("corridor-highlight"),
           );
 
-          // Drop a permanent pile marker (slightly randomized spread)
-          const pile = document.createElement("div");
-          pile.className = `pile-marker ${truckType === "Small" ? "small-truck" : "large-truck"}`;
-          pile.innerText = "🪨";
-          const offX = (Math.random() - 0.5) * 20;
-          const offY = (Math.random() - 0.5) * 20;
-          pile.style.transform = `translate(${targetX - 10 + offX}px, ${targetY - 10 + offY}px)`;
-          uiElements.map.insertBefore(pile, uiElements.map.firstChild); // drop behind running trucks
+          // Drop sand particles explicitly (sand-like falling and spreading)
+          for (let p = 0; p < (truckType === "Small" ? 15 : 40); p++) {
+            setTimeout(
+              () => {
+                const sand = document.createElement("div");
+                sand.className = "sand-fall";
+                // spread left/right within the grid width roughly
+                const dx = targetX - 5 + (Math.random() - 0.5) * 45;
+                // fall from truck center height to grid top surface
+                const fallDistance = 40;
+                const yStart = targetY - 40;
+                // Add variables for keyframe
+                sand.style.setProperty("--dx", `${dx}px`);
+                sand.style.setProperty("--start-y", `${yStart}px`);
+                sand.style.setProperty("--end-y", `${yStart + fallDistance}px`);
+
+                uiElements.map.insertBefore(sand, uiElements.map.firstChild);
+
+                // Remove the node after falling animation
+                setTimeout(() => sand.remove(), 600);
+              },
+              p * 15 + Math.random() * 20,
+            ); // random scatter and sequence drops
+          }
 
           // Check Outward-to-Inward Pattern progression logic
           if (isPrimaryTarget && fillPct >= 90) {
