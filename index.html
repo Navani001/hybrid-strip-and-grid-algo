@@ -113,6 +113,7 @@
         display: flex;
         flex-direction: column;
         gap: 20px;
+        transition: gap 0.3s ease;
       }
 
       /* Strip and Grid Layout */
@@ -120,6 +121,7 @@
         display: flex;
         gap: 30px;
         justify-content: center;
+        transition: gap 0.3s ease;
       }
 
       .strip {
@@ -129,6 +131,7 @@
         border: 2px solid #555;
         border-radius: 8px;
         gap: 8px;
+        transition: all 0.3s ease;
       }
 
       .grid {
@@ -370,6 +373,33 @@
           transform: scale(1);
         }
       }
+
+      /* Hide Grid Toggle Styles */
+      body.hide-grids .map-container {
+        gap: 2px;
+      }
+      body.hide-grids .row {
+        gap: 2px;
+      }
+      body.hide-grids .strip {
+        background: transparent;
+        border-color: transparent;
+        padding: 2px;
+        gap: 1px;
+      }
+      body.hide-grids .grid {
+        background: transparent;
+        border-color: transparent;
+      }
+      body.hide-grids .grid .label {
+        opacity: 0;
+      }
+      body.hide-grids .grid.blocked {
+        opacity: 0 !important;
+      }
+      body.hide-grids .gate {
+        opacity: 0.2;
+      }
     </style>
   </head>
   <body>
@@ -412,6 +442,25 @@
           onclick="setAreaShape('ushape')"
         >
           U-Shape
+        </button>
+      </div>
+
+      <div
+        style="
+          margin-left: 20px;
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          border-left: 2px solid #444;
+          padding-left: 20px;
+        "
+      >
+        <button
+          class="shape-btn"
+          id="btn-toggle-grid"
+          onclick="toggleGrid()"
+        >
+          Hide Grid
         </button>
       </div>
 
@@ -552,6 +601,20 @@
         log("System Initialized. Strips mapped. Patterns loaded.");
         setAreaShape("rect"); // Initialize default shape
       }
+
+      window.toggleGrid = function () {
+        const isHidden = document.body.classList.toggle("hide-grids");
+        const btn = document.getElementById("btn-toggle-grid");
+        if (isHidden) {
+          btn.classList.add("active");
+          btn.innerText = "Show Grid";
+          log("Grid lines hidden. Only showing piles/sand.");
+        } else {
+          btn.classList.remove("active");
+          btn.innerText = "Hide Grid";
+          log("Grid lines visible.");
+        }
+      };
 
       window.setAreaShape = function (shape) {
         document
