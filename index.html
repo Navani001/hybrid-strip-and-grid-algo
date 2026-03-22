@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamic Dump Allocation Simulation</title>
+    <style>
+      :root {
+        --bg-dark: #121212;
+        --panel-bg: #1e1e1e;
+        --border-color: #333;
+        --accent-green: #4caf50;
+        --accent-yellow: #ffeb3b;
+        --accent-blue: #2196f3;
+        --accent-red: #f44336;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-dark);
+        color: #eee;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        box-sizing: border-box;
+      }
+
+      h1 {
+        margin-top: 0;
+        font-size: 24px;
+        color: #fff;
+      }
+
+      /* Controls / Top Bar */
+      .controls {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        background: var(--panel-bg);
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+      }
+
+      button {
+        padding: 12px 24px;
+        font-size: 16px;
+        font-weight: bold;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+
+      .btn-small {
+        background-color: #bbdefb;
+        color: #0d47a1;
+      }
+      .btn-large {
+        background-color: #ffcdd2;
+        color: #b71c1c;
+      }
+
+      .shape-btn {
+        background-color: #444;
+        color: #ccc;
+        padding: 8px 16px;
+        font-size: 13px;
+        border-radius: 4px;
+        box-shadow: none;
+      }
+      .shape-btn.active {
+        background-color: var(--accent-green);
+        color: #fff;
+        box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.2);
+      }
+
+      .grid.blocked {
+        opacity: 0.15;
+        background: #111 !important;
+        border: 1px dotted #333 !important;
+        pointer-events: none;
+      }
+
+      /* Main Layout */
+      .main-content {
+        display: flex;
+        flex: 1;
+        gap: 20px;
+        min-height: 0;
+      }
+
+      /* Map Area */
+      .map-container {
+        flex: 3;
+        background: #181818;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        position: relative;
+        padding: 30px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      /* Strip and Grid Layout */
+      .row {
+        display: flex;
+        gap: 30px;
+        justify-content: center;
+      }
+
+      .strip {
+        display: flex;
+        background: #252525;
+        padding: 10px;
+        border: 2px solid #555;
+        border-radius: 8px;
+        gap: 8px;
+      }
+
+      .grid {
+        width: 50px;
+        height: 70px;
+        background: #333;
+        border: 1px dashed #666;
+        position: relative;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+      }
+
+      .grid.locked {
+        border: 3px solid var(--accent-yellow);
+        box-shadow: 0 0 15px rgba(255, 235, 59, 0.4);
+        transform: scale(1.05);
+        z-index: 2;
+      }
+
+      .grid .fill {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: var(--accent-green);
+        opacity: 0.8;
+        border-radius: inherit;
+        transition: height 0.5s ease-out;
+        z-index: 1;
+      }
+
+      .grid .label {
+        position: relative;
+        z-index: 2;
+        font-size: 11px;
+        font-weight: bold;
+        text-align: center;
+        line-height: 1.2;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        pointer-events: none;
+      }
+
+      .corridor-highlight {
+        background-color: rgba(33, 150, 243, 0.25) !important;
+        box-shadow: 0 0 10px rgba(33, 150, 243, 0.5) inset;
+        border-color: #2196f3 !important;
+        transition: all 0.3s ease;
+      }
+
+      .checking-scan {
+        border-color: #ff9800 !important;
+        background-color: rgba(255, 152, 0, 0.3) !important;
+        box-shadow: 0 0 15px rgba(255, 152, 0, 0.6) inset;
+        transform: scale(1.1);
+        z-index: 3;
+        transition: all 0.1s ease;
+      }
+
+      .checking-corridor {
+        border-color: #9c27b0 !important;
+        background-color: rgba(156, 39, 176, 0.3) !important;
+        box-shadow: 0 0 10px rgba(156, 39, 176, 0.4) inset;
+        transition: all 0.05s ease;
+      }
+
+      /* Right Sidebar Panel */
+      .sidebar {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .panel {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      h3 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+        border-bottom: 1px solid #444;
+        padding-bottom: 8px;
+      }
+
+      /* Tokens Tracker */
+      .token-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        flex: 1;
+        overflow-y: auto;
+        max-height: 200px;
+      }
+
+      .token-item {
+        background: #2a2a2a;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        border-left: 4px solid var(--accent-yellow);
+        border-radius: 4px;
+        font-size: 14px;
+        font-family: monospace;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: fadeIn 0.3s;
+      }
+
+      /* Log window */
+      .log-window {
+        flex: 1;
+        background: #000;
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 10px;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 13px;
+        color: #a5d6a7;
+        overflow-y: auto;
+        max-height: 350px;
+        white-space: pre-wrap;
+      }
+
+      /* Animations & Sprites */
+      .truck-vehicle {
+        position: absolute;
+        z-index: 100;
+        transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+        transform-origin: center;
+        font-size: 24px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .small-truck {
+        transform: scale(0.9);
+      }
+
+      .large-truck {
+        transform: scale(1.4);
+        filter: hue-rotate(
+          140deg
+        ); /* Make the emoji look different colored if possible or just rely on scale */
+      }
+
+      .pile-marker {
+        position: absolute;
+        z-index: 5;
+        pointer-events: none;
+        opacity: 0;
+        animation: dropIn 0.3s forwards;
+        font-size: 16px;
+      }
+
+      /* Entrance Point Marker */
+      .gate {
+        position: absolute;
+        bottom: 10px;
+        left: 20px;
+        padding: 5px 15px;
+        background: #333;
+        border: 2px dashed #666;
+        color: #888;
+        font-weight: bold;
+        font-size: 12px;
+        border-radius: 4px;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateX(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      @keyframes dropIn {
+        from {
+          opacity: 0;
+          transform: scale(2);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <button class="btn-small" onclick="dispatchTruck(20, 'Small')">
+        🚛 Small Truck (20)
+      </button>
+      <button class="btn-large" onclick="dispatchTruck(50, 'Large')">
+        🚀 Large Truck (50)
+      </button>
+
+      <div
+        style="
+          margin-left: 20px;
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          border-left: 2px solid #444;
+          padding-left: 20px;
+        "
+      >
+        <span style="font-size: 14px; color: #aaa">Boundary Shape:</span>
+        <button
+          class="shape-btn active"
+          id="btn-rect"
+          onclick="setAreaShape('rect')"
+        >
+          Rectangle
+        </button>
+        <button
+          class="shape-btn"
+          id="btn-triangle"
+          onclick="setAreaShape('triangle')"
+        >
+          Triangle
+        </button>
+        <button
+          class="shape-btn"
+          id="btn-ushape"
+          onclick="setAreaShape('ushape')"
+        >
+          U-Shape
+        </button>
+      </div>
+
+      <div
+        style="
+          margin-left: auto;
+          align-self: center;
+          font-size: 14px;
+          color: #aaa;
+        "
+      >
+        Prototype V2: Outward ➔ Inward Allocation Engine
+      </div>
+    </div>
+
+    <div class="main-content">
+      <!-- Left: Map Viewer -->
+      <div class="map-container" id="mapViewer">
+        <div class="gate" id="spawnGate">SPAWN / EXIT GATE</div>
+        <!-- Rows and Strips injected by JS here -->
+      </div>
+
+      <!-- Right: Status Panels -->
+      <div class="sidebar">
+        <div class="panel" style="flex: 0 0 auto">
+          <h3>Active Tokens (Locked) 🔒</h3>
+          <ul class="token-list" id="tokenList">
+            <li
+              style="
+                color: #666;
+                font-style: italic;
+                border: none;
+                background: transparent;
+              "
+            >
+              No active tokens
+            </li>
+          </ul>
+        </div>
+
+        <div class="panel" style="flex: 1">
+          <h3>System Logs 📋</h3>
+          <div class="log-window" id="sysLog"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- 1. System Parameters ---
+      const CONFIG = {
+        numRows: 4,
+        stripsPerRow: 2,
+        gridsPerStrip: 8,
+        gridCapacity: 100,
+      };
+
+      const STATE = {
+        strips: [],
+        activeTokens: [], // tracks {stripId, gridId}
+      };
+
+      const uiElements = {
+        map: document.getElementById("mapViewer"),
+        tokenList: document.getElementById("tokenList"),
+        sysLog: document.getElementById("sysLog"),
+        gate: document.getElementById("spawnGate"),
+      };
+
+      function log(msg) {
+        const time = new Date().toLocaleTimeString("en-US", { hour12: false });
+        uiElements.sysLog.innerHTML =
+          `[${time}] ${msg}\n` + uiElements.sysLog.innerHTML;
+      }
+
+      // --- 2. Initialization ---
+      function initSystem() {
+        let stripIdCounter = 1;
+
+        for (let r = 0; r < CONFIG.numRows; r++) {
+          const rowDiv = document.createElement("div");
+          rowDiv.className = "row";
+
+          for (let s = 0; s < CONFIG.stripsPerRow; s++) {
+            const currentStripId = stripIdCounter++;
+            const stripDiv = document.createElement("div");
+            stripDiv.className = "strip";
+
+            let grids = [];
+            for (let g = 1; g <= CONFIG.gridsPerStrip; g++) {
+              const gridDiv = document.createElement("div");
+              gridDiv.className = "grid";
+              gridDiv.id = `grid-${currentStripId}-${g}`;
+
+              gridDiv.innerHTML = `
+                            <div class="fill" style="height: 0%"></div>
+                            <div class="label">S${currentStripId}<br>G${g}</div>
+                        `;
+              stripDiv.appendChild(gridDiv);
+
+              grids[g] = {
+                // 1-indexed to match label logic nicely
+                id: g,
+                div: gridDiv,
+                fill: 0,
+                capacity: CONFIG.gridCapacity,
+                locked: false,
+                blocked: false,
+              };
+            }
+
+            // Outward-to-Inward Pattern generation
+            // e.g., for 8 grids: [1, 8, 2, 7, 3, 6, 4, 5]
+            let pattern = [];
+            let left = 1,
+              right = CONFIG.gridsPerStrip;
+            while (left <= right) {
+              if (left === right) {
+                pattern.push(left);
+                break;
+              }
+              pattern.push(left);
+              pattern.push(right);
+              left++;
+              right--;
+            }
+
+            STATE.strips.push({
+              id: currentStripId,
+              grids: grids,
+              pattern: pattern,
+              currentIndex: 0, // points to pattern array
+            });
+
+            rowDiv.appendChild(stripDiv);
+          }
+          uiElements.map.appendChild(rowDiv);
+        }
+        log("System Initialized. Strips mapped. Patterns loaded.");
+        setAreaShape("rect"); // Initialize default shape
+      }
+
+      window.setAreaShape = function (shape) {
+        document
+          .querySelectorAll(".shape-btn")
+          .forEach((b) => b.classList.remove("active"));
+        document.getElementById("btn-" + shape).classList.add("active");
+
+        for (let r = 0; r < CONFIG.numRows; r++) {
+          for (let s = 0; s < CONFIG.stripsPerRow; s++) {
+            let sIdx = r * CONFIG.stripsPerRow + s;
+            let strip = STATE.strips[sIdx];
+
+            for (let g = 1; g <= CONFIG.gridsPerStrip; g++) {
+              let grid = strip.grids[g];
+              let x = s * CONFIG.gridsPerStrip + (g - 1); // absolute x index from 0 to 15
+              let y = r; // absolute y index from 0 to 3
+
+              let blocked = false;
+
+              if (shape === "triangle") {
+                let minX = 6 - y * 2;
+                let maxX = 9 + y * 2;
+                if (x < minX || x > maxX) blocked = true;
+              } else if (shape === "ushape") {
+                if (y === 0 && x >= 4 && x <= 11) blocked = true;
+                if (y === 1 && x >= 5 && x <= 10) blocked = true;
+                if (y === 2 && x >= 6 && x <= 9) blocked = true;
+              }
+
+              grid.blocked = blocked;
+              if (blocked) {
+                grid.div.classList.add("blocked");
+              } else {
+                grid.div.classList.remove("blocked");
+              }
+            }
+          }
+        }
+        log(`Boundary Shape changed to: ${shape.toUpperCase()}`);
+      };
+
+      // --- 3. UI Token Updating ---
+      function updateTokenUI() {
+        if (STATE.activeTokens.length === 0) {
+          uiElements.tokenList.innerHTML = `<li style="color: #666; font-style: italic; background: transparent; border:none;">No active tokens</li>`;
+          return;
+        }
+
+        uiElements.tokenList.innerHTML = "";
+        STATE.activeTokens.forEach((t) => {
+          const li = document.createElement("li");
+          li.className = "token-item";
+          li.innerHTML = `🔒 <span>Strip <b>${t.stripId}</b> | Grid <b>${t.gridId}</b></span>`;
+          uiElements.tokenList.appendChild(li);
+        });
+      }
+
+      // --- 4. Allocation & Dispatch Logic ---
+      window.dispatchTruck = async function (truckVol, truckType) {
+        log(`Request: ${truckType} Truck (Vol: ${truckVol})`);
+        let allocated = false;
+
+        // Loop through all strips to find first valid grid using Outward/Inward pattern
+        for (let sIdx = 0; sIdx < STATE.strips.length; sIdx++) {
+          let strip = STATE.strips[sIdx];
+
+          // Repair logic: Auto-advance currentIndex past fully filled or "shape-blocked" grids
+          while (
+            strip.currentIndex < strip.pattern.length &&
+            (strip.grids[strip.pattern[strip.currentIndex]].fill >=
+              strip.grids[strip.pattern[strip.currentIndex]].capacity * 0.9 ||
+              strip.grids[strip.pattern[strip.currentIndex]].blocked)
+          ) {
+            strip.currentIndex++;
+          }
+
+          // Enforce column dependency: Only skip if the strip directly above CAN physically fit this truck
+          let rowIdx = Math.floor(sIdx / CONFIG.stripsPerRow);
+          if (rowIdx > 0) {
+            let stripAbove = STATE.strips[sIdx - CONFIG.stripsPerRow];
+
+            let functionallyFull = true;
+            for (let i = 1; i <= CONFIG.gridsPerStrip; i++) {
+              let g = stripAbove.grids[i];
+              if (!g.blocked && g.capacity - g.fill >= truckVol) {
+                functionallyFull = false;
+                break;
+              }
+            }
+
+            if (
+              stripAbove.currentIndex < stripAbove.pattern.length &&
+              !functionallyFull
+            ) {
+              continue; // Skip this strip until the one above it is completely filled or cannot fit this truck
+            }
+          }
+
+          // Lookahead: Search the entire remaining pattern sequence for an empty spot
+          let elementsRemaining = strip.pattern.length - strip.currentIndex;
+          for (let offset = 0; offset < elementsRemaining; offset++) {
+            let ptr = strip.currentIndex + offset;
+            if (ptr >= strip.pattern.length) continue;
+
+            let gridId = strip.pattern[ptr];
+            let currentGrid = strip.grids[gridId];
+
+            // Visual Check - Target Grid
+            currentGrid.div.classList.add("checking-scan");
+            await new Promise((r) => setTimeout(r, 15)); // ultra-fast check
+            currentGrid.div.classList.remove("checking-scan");
+
+            let availableSpace = currentGrid.capacity - currentGrid.fill;
+
+            // Check access corridor: ensure path is not blocked by ACTIVE TRUCKS
+            let corridorBlocked = false;
+            for (let i = 1; i < gridId; i++) {
+              if (strip.grids[i].blocked) continue; // Skip shape boundary fields
+
+              // Visual Check - Corridor Path
+              strip.grids[i].div.classList.add("checking-corridor");
+              await new Promise((r) => setTimeout(r, 5)); // ultra-fast visual pulse
+              strip.grids[i].div.classList.remove("checking-corridor");
+
+              if (strip.grids[i].locked) {
+                corridorBlocked = true; // Blocked because another truck is currently in our lane
+              }
+            }
+
+            if (corridorBlocked) {
+              log(
+                `<span style="color:orange">Path temporarily blocked by active truck for Strip ${strip.id}, Grid ${gridId}. Trying next option.</span>`,
+              );
+              continue; // Skip this grid until path truck leaves
+            }
+            if (
+              availableSpace >= truckVol &&
+              !currentGrid.locked &&
+              !currentGrid.blocked
+            ) {
+              // FOUND A VALID SPOT!
+
+              // 1. Acquire Token Lock
+              currentGrid.locked = true;
+              currentGrid.div.classList.add("locked");
+              STATE.activeTokens.push({ stripId: strip.id, gridId: gridId });
+              updateTokenUI();
+
+              log(
+                `<span style="color:yellow">TOKEN GRANTED</span> -> Strip ${strip.id}, Grid ${gridId}.`,
+              );
+              allocated = true;
+
+              // 2. Trigger Driving Animation and logic lifecycle
+              simulateTruckLifecycle(
+                strip,
+                currentGrid,
+                truckVol,
+                truckType,
+                offset === 0,
+                gridId,
+              );
+              break;
+            }
+          }
+          if (allocated) break;
+        }
+
+        if (!allocated) {
+          log(
+            `<span style="color:red">ERROR: No available/unlocked zones. System Busy/Full.</span>`,
+          );
+          alert(
+            "Dump Area is full or heavily congested! All suitable grids are actively locked by other operations.",
+          );
+        }
+      };
+
+      // --- 5. Async Animation Lifecycle ---
+      function simulateTruckLifecycle(
+        strip,
+        currentGrid,
+        truckVol,
+        truckType,
+        isPrimaryTarget,
+        gridId,
+      ) {
+        // Highlight access corridor
+        let corridorGrids = [];
+        for (let i = 1; i <= gridId; i++) {
+          let g = strip.grids[i];
+          if (g && !g.blocked) {
+            g.div.classList.add("corridor-highlight");
+            corridorGrids.push(g);
+          }
+        }
+
+        // A. Spawn truck at gate
+        const mapRect = uiElements.map.getBoundingClientRect();
+        const gateRect = uiElements.gate.getBoundingClientRect();
+        const gridRect = currentGrid.div.getBoundingClientRect();
+
+        // Calculate coordinates relative to the map container
+        const startX = gateRect.left - mapRect.left + 50;
+        const startY = gateRect.top - mapRect.top - 10;
+
+        const targetX = gridRect.left - mapRect.left + gridRect.width / 2;
+        const targetY = gridRect.top - mapRect.top + gridRect.height / 2;
+
+        // Create DOM Element for truck
+        const truckDiv = document.createElement("div");
+        truckDiv.className = `truck-vehicle ${truckType === "Small" ? "small-truck" : "large-truck"}`;
+        truckDiv.innerText = "🚛";
+
+        // Set initial spawn transform
+        truckDiv.style.transform = `translate(${startX}px, ${startY}px)`;
+        uiElements.map.appendChild(truckDiv);
+
+        // B. Drive to target
+        setTimeout(() => {
+          truckDiv.style.transform = `translate(${targetX - 10}px, ${targetY - 10}px)`; // offset for centering marker visually
+        }, 50);
+
+        // C. Execute Dump on Arrival (Timer mapped to CSS transition time -> 1.2s)
+        setTimeout(() => {
+          // Process volume - Spread the load to nearby grids
+          const mainVol = truckVol * 0.6;
+          const sideVol = truckVol * 0.2;
+
+          currentGrid.fill = Math.min(
+            currentGrid.capacity,
+            currentGrid.fill + mainVol,
+          );
+
+          // Spread to adjacent grids in the same strip (left and right) if they exist
+          const prevGrid = strip.grids[currentGrid.id - 1];
+          const nextGrid = strip.grids[currentGrid.id + 1];
+
+          if (prevGrid) {
+            prevGrid.fill = Math.min(
+              prevGrid.capacity,
+              prevGrid.fill + sideVol,
+            );
+            prevGrid.div.querySelector(".fill").style.height =
+              `${(prevGrid.fill / prevGrid.capacity) * 100}%`;
+          }
+          if (nextGrid) {
+            nextGrid.fill = Math.min(
+              nextGrid.capacity,
+              nextGrid.fill + sideVol,
+            );
+            nextGrid.div.querySelector(".fill").style.height =
+              `${(nextGrid.fill / nextGrid.capacity) * 100}%`;
+          }
+
+          // Release Token constraints
+          currentGrid.locked = false;
+          currentGrid.div.classList.remove("locked");
+
+          STATE.activeTokens = STATE.activeTokens.filter(
+            (t) => !(t.stripId === strip.id && t.gridId === currentGrid.id),
+          );
+          updateTokenUI();
+
+          let fillPct = (currentGrid.fill / currentGrid.capacity) * 100;
+          log(
+            `<span style="color:var(--accent-green)">DUMP COMPLETE</span> -> Strip ${strip.id}, Grid ${currentGrid.id} is at ${Math.floor(fillPct)}%. Token Released.`,
+          );
+
+          // Update visuals on the grid
+          currentGrid.div.querySelector(".fill").style.height = `${fillPct}%`;
+
+          // Remove corridor highlight
+          corridorGrids.forEach((g) =>
+            g.div.classList.remove("corridor-highlight"),
+          );
+
+          // Drop a permanent pile marker (slightly randomized spread)
+          const pile = document.createElement("div");
+          pile.className = `pile-marker ${truckType === "Small" ? "small-truck" : "large-truck"}`;
+          pile.innerText = "🪨";
+          const offX = (Math.random() - 0.5) * 20;
+          const offY = (Math.random() - 0.5) * 20;
+          pile.style.transform = `translate(${targetX - 10 + offX}px, ${targetY - 10 + offY}px)`;
+          uiElements.map.insertBefore(pile, uiElements.map.firstChild); // drop behind running trucks
+
+          // Check Outward-to-Inward Pattern progression logic
+          if (isPrimaryTarget && fillPct >= 90) {
+            strip.currentIndex++;
+            log(
+              `Target Grid ${currentGrid.id} Threshold Met. Pattern progressing inwards.`,
+            );
+          }
+
+          // D. Initiate Return Trip bounds
+          setTimeout(() => {
+            log(`[RETURN] ${truckType} Truck heading back.`);
+            truckDiv.style.transform = `translate(${startX}px, ${startY}px)`;
+
+            // Final cleanup when reached gate
+            setTimeout(() => {
+              truckDiv.remove();
+            }, 1200);
+          }, 400); // short wait before driving off
+        }, 1250); // 1.2s drive time + 50ms buffer
+      }
+
+      // Bootstrap on load
+      window.addEventListener("DOMContentLoaded", initSystem);
+    </script>
+  </body>
+</html>
