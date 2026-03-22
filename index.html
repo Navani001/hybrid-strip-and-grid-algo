@@ -766,16 +766,22 @@
         truckDiv.className = `truck-vehicle ${truckType === "Small" ? "small-truck" : "large-truck"}`;
         truckDiv.innerText = "🚛";
 
-        // Set initial spawn transform
-        truckDiv.style.transform = `translate(${startX}px, ${startY}px)`;
+        // Set initial spawn transform (scaleX(-1) to face right)
+        truckDiv.style.transform = `translate(${startX}px, ${startY}px) scaleX(-1)`;
         uiElements.map.appendChild(truckDiv);
 
-        // B. Drive to target
+        // B. Drive past the target (Staging for reverse)
         setTimeout(() => {
-          truckDiv.style.transform = `translate(${targetX - 10}px, ${targetY - 10}px)`; // offset for centering marker visually
+          truckDiv.style.transform = `translate(${targetX + 40}px, ${targetY - 10}px) scaleX(-1)`;
         }, 50);
 
-        // C. Execute Dump on Arrival (Timer mapped to CSS transition time -> 1.2s)
+        // C. Reverse into the target spot
+        setTimeout(() => {
+          truckDiv.style.transitionDuration = "0.8s"; // Reversing speed
+          truckDiv.style.transform = `translate(${targetX - 10}px, ${targetY - 10}px) scaleX(-1)`;
+        }, 1250);
+
+        // D. Execute Dump on Arrival
         setTimeout(() => {
           // Process volume - Spread the load to nearby grids
           const mainVol = truckVol * 0.6;
@@ -862,17 +868,19 @@
             );
           }
 
-          // D. Initiate Return Trip bounds
+          // E. Initiate Return Trip bounds
           setTimeout(() => {
             log(`[RETURN] ${truckType} Truck heading back.`);
-            truckDiv.style.transform = `translate(${startX}px, ${startY}px)`;
+            truckDiv.style.transitionDuration = "1.2s"; // Reset speed
+            // Flip back to face left scaleX(1) for the return trip
+            truckDiv.style.transform = `translate(${startX}px, ${startY}px) scaleX(1)`;
 
             // Final cleanup when reached gate
             setTimeout(() => {
               truckDiv.remove();
             }, 1200);
-          }, 400); // short wait before driving off
-        }, 1250); // 1.2s drive time + 50ms buffer
+          }, 800); // wait before driving off after dump
+        }, 2100); // 1250ms (forward) + 850ms (reverse sequence)
       }
 
       // Bootstrap on load
